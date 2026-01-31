@@ -1,0 +1,203 @@
+This project structure follows the **Monorepo Pattern**, which is the industry standard for full-stack applications where the frontend and backend need to share types or deployment configurations. This separation ensures your code remains clean, modular, and scalable.
+
+### **Root Directory Overview**
+
+We separate the project into three logical workspaces:
+
+1. **`apps/web`**: The Next.js Frontend (Patient & Doctor UI).
+2. **`apps/api`**: The Python FastAPI Backend (AI Logic & API).
+3. **`infra`**: Infrastructure as Code (Terraform/Docker).
+
+```plaintext
+nidaan-monorepo/
+├── apps/
+│   ├── web/                 # Next.js 14 (App Router)
+│   └── api/                 # FastAPI (Python)
+├── infra/                   # Terraform & Docker
+├── packages/                # Shared libraries (Optional)
+│   └── types/               # Shared TypeScript/Python types
+├── .github/                 # CI/CD Workflows
+├── .gitignore
+├── README.md
+└── docker-compose.yml       # For local development
+
+```
+
+---
+
+### **1. Backend Structure (`apps/api`)**
+
+**Framework:** FastAPI (Python)
+**Philosophy:** Domain-Driven Design (DDD). We group code by "feature" (e.g., `patients`, `diagnosis`) rather than by "type" (e.g., `controllers`, `models`).
+
+```plaintext
+apps/api/
+├── app/
+│   ├── core/                # Core configurations & security
+│   │   ├── config.py        # Env variables (AWS credentials)
+│   │   ├── security.py      # JWT & Auth logic
+│   │   ├── db.py            # Database connection (DynamoDB/Postgres)
+│   │   └── exceptions.py    # Custom error handlers
+│   │
+│   ├── services/            # The "Brains" (AI & External Integrations)
+│   │   ├── llm_engine/      # LangChain/Bedrock logic
+│   │   │   ├── prompts.py   # System prompts for the AI
+│   │   │   └── chain.py     # The RAG pipeline
+│   │   ├── speech/          # AWS Transcribe logic
+│   │   └── storage.py       # S3 upload/download logic
+│   │
+│   ├── api/                 # API Routes (Controllers)
+│   │   ├── v1/
+│   │   │   ├── router.py    # Main router aggregator
+│   │   │   ├── patients.py  # Patient-related endpoints
+│   │   │   ├── doctors.py   # Doctor dashboard endpoints
+│   │   │   └── audio.py     # Audio upload/processing endpoints
+│   │
+│   ├── schemas/             # Pydantic Models (Data Validation)
+│   │   ├── patient.py       # Patient input/output schemas
+│   │   └── medical.py       # SOAP note structure
+│   │
+│   └── main.py              # Application entry point
+│
+├── tests/                   # Pytest folder
+├── Dockerfile               # Backend container config
+├── requirements.txt         # Python dependencies
+└── pyproject.toml           # Tool configuration
+
+```
+
+**Why this structure?**
+
+* **`services/` vs `api/**`: The `api` folder only handles HTTP requests/responses. The `services` folder contains the actual business logic. This allows you to reuse logic (e.g., call the AI engine from a CLI script) without going through the API.
+
+---
+
+### **2. Frontend Structure (`apps/web`)**
+
+**Framework:** Next.js 14+ (App Router)
+**Philosophy:** Feature-based co-location. Keep components, hooks, and styles close to where they are used.
+
+```plaintext
+apps/web/
+├── app/                     # App Router (Pages & Layouts)
+│   ├── (auth)/              # Auth routes group (Login/Signup)
+│   │   ├── login/
+│   │   └── register/
+│   ├── (dashboard)/         # Protected routes group
+│   │   ├── doctor/          # Doctor's Dashboard
+│   │   │   ├── page.tsx
+│   │   │   └── columns.tsx  # Table definitions
+│   │   └── patient/         # Patient's Mobile View
+│   │       ├── page.tsx
+│   │       └── record-audio.tsx
+│   ├── api/                 # Next.js API Routes (Proxy/Edge)
+│   ├── layout.tsx           # Root layout
+│   └── globals.css          # Tailwind imports
+│
+├── components/              # Shared UI Components
+│   ├── ui/                  # Shadcn UI (Buttons, Cards, Inputs)
+│   ├── shared/              # Navbar, Footer, Sidebar
+│   └── features/            # Complex Feature Components
+│       ├── audio-recorder/  # Audio recording logic
+│       └── soap-note-view/  # The Doctor's Note card
+│
+├── lib/                     # Utilities & Helpers
+│   ├── api.ts               # Axios/Fetch instance
+│   ├── utils.ts             # CN helper for Tailwind
+│   └── store.ts             # Zustand Store (State Management)
+│
+├── hooks/                   # Custom React Hooks
+│   ├── use-audio.ts         # Hook for MediaRecorder API
+│   └── use-socket.ts        # Hook for Real-time updates
+│
+├── types/                   # TypeScript Interfaces
+├── public/                  # Static assets (images/icons)
+├── .env.local               # Local environment variables
+├── next.config.js
+└── tailwind.config.ts
+
+```
+
+**Why this structure?**
+
+* **`(groups)`**: Using parentheses `(dashboard)` groups routes logically without affecting the URL path.
+* **`lib/api.ts`**: A centralized place for API calls makes it easy to handle auth tokens or swap the backend URL later.
+
+---
+
+### **3. Infrastructure (`infra/`)**
+
+**Tool:** Terraform (Recommended) or pure Docker Compose.
+
+```plaintext
+infra/
+├── terraform/
+│   ├── modules/
+│   │   ├── networking/      # VPC, Subnets, Security Groups
+│   │   ├── compute/         # Lambda / ECS / Fargate
+│   │   └── database/        # DynamoDB, RDS
+│   ├── environments/
+│   │   ├── dev/             # Dev specific vars (t2.micro)
+│   │   └── prod/            # Prod specific vars (auto-scaling)
+│   └── main.tf              # Entry point
+│
+└── docker/
+    ├── nginx.conf           # Reverse proxy config
+    └── docker-compose.yml   # For spinning up local DBs
+
+```
+
+---
+
+### **Example Code Snippets (To visualize the connection)**
+
+**1. The API Entry (`apps/api/app/main.py`)**
+
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.api.v1.router import api_router
+from app.core.config import settings
+
+app = FastAPI(title="Nidaan API")
+
+# CORS (Crucial for connecting Frontend to Backend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"], # Next.js URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router, prefix="/api/v1")
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "service": "nidaan-api"}
+
+```
+
+**2. The Frontend API Client (`apps/web/lib/api.ts`)**
+
+```typescript
+import axios from 'axios';
+
+// Connects to the FastAPI Backend
+export const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Example function
+export const uploadAudio = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api.post('/audio/upload', formData);
+};
+
+```
+
+This structure is "Senior Engineer Approved" because it separates concerns cleanly. You can hire a Python dev to work in `apps/api` and a React dev to work in `apps/web` without them constantly causing merge conflicts for each other.

@@ -1,0 +1,105 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Nidaan Triage API for Orchestrate",
+    "description": "Check and manage urgent patient triage cases",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://nidaan-api.25r5a6g2yvmy.eu-de.codeengine.appdomain.cloud",
+      "description": "IBM Cloud Code Engine"
+    }
+  ],
+  "paths": {
+    "/api/v1/triage/api/urgent-cases": {
+      "get": {
+        "operationId": "getUrgentCases",
+        "summary": "Get Urgent Cases",
+        "description": "Returns all HIGH severity triage cases. Use when doctor asks about urgent patients.",
+        "responses": {
+          "200": {
+            "description": "List of urgent cases",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer",
+                      "description": "Number of urgent cases"
+                    },
+                    "cases": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "case_id": {
+                            "type": "string"
+                          },
+                          "patient_name": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string"
+                          },
+                          "red_flags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "summary": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/api/cases/{case_id}/seen": {
+      "post": {
+        "operationId": "markCaseAsSeen",
+        "summary": "Mark Case as Seen",
+        "description": "Marks a triage case as seen by the doctor.",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The triage case ID to mark as seen"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case marked as seen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

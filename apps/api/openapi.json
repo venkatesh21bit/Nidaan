@@ -1,0 +1,2034 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Nidaan Voice Triage API",
+    "description": "AI-powered patient triage system for IBM watsonx Orchestrate integration",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Nidaan AI Team",
+      "email": "support@nidaan.ai"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.nidaan.ai",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/api/v1/triage/health": {
+      "get": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "Triage Module Health Check",
+        "description": "Check the health status of all triage-related services",
+        "operationId": "triage_health_check_api_v1_triage_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriageHealthCheck"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/appointments": {
+      "post": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "Book Appointment (Triggers Triage Workflow)",
+        "description": "Create a new appointment and automatically trigger the triage workflow.\n    \n    **Workflow Steps:**\n    1. Creates appointment record in Cloudant\n    2. Generates personalized pre-consultation survey\n    3. Sends survey email to patient\n    4. Returns appointment and survey IDs\n    \n    This is the entry point for the autonomous patient intake system.",
+        "operationId": "create_appointment_api_v1_triage_appointments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/surveys/respond": {
+      "post": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "Submit Survey Response",
+        "description": "Submit a patient's response to the pre-consultation survey.\n    \n    **Processing Steps:**\n    1. Extracts medical entities using IBM Watson NLU\n    2. Calculates severity score\n    3. Detects red flag symptoms\n    4. Updates EHR database\n    5. Alerts nurse station if HIGH severity",
+        "operationId": "submit_survey_response_api_v1_triage_surveys_respond_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SurveyResponseSubmit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResponseResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/voice": {
+      "post": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "Submit Voice Recording for Triage",
+        "description": "Process a voice recording through the complete triage pipeline.\n    \n    **Pipeline Steps:**\n    1. **Speech-to-Text**: IBM Watson converts audio to transcript\n    2. **NLU Processing**: Extracts symptoms, medications, entities\n    3. **Severity Assessment**: Calculates HIGH/MEDIUM/LOW severity\n    4. **Red Flag Detection**: Identifies critical symptoms\n    5. **EHR Update**: Stores structured data in patient record\n    6. **Nurse Alert**: Sends alert if HIGH severity with red flags\n    \n    **Supported Audio Formats:**\n    - audio/webm (recommended for browser recording)\n    - audio/wav\n    - audio/mp3\n    - audio/ogg\n    \n    **Supported Languages:**\n    - en-IN (Indian English) - default\n    - en-US (US English)\n    - hi-IN (Hindi)",
+        "operationId": "process_voice_triage_api_v1_triage_voice_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_process_voice_triage_api_v1_triage_voice_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceTriageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/api/urgent-cases": {
+      "get": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "Get Urgent Cases (Orchestrate API)",
+        "description": "**For IBM watsonx Orchestrate Integration**\n    \n    Returns all urgent (HIGH severity) triage cases that haven't been seen.\n    \n    This endpoint is called by the AI agent when a doctor asks:\n    - \"Do we have any urgent patients waiting?\"\n    - \"Any critical cases I should know about?\"\n    - \"Show me the urgent triage list\"\n    \n    **Response includes:**\n    - Count of urgent cases\n    - Detailed information for each case\n    - Human-readable summaries for the AI agent\n    \n    **OpenAPI Spec:**\n    Export this endpoint's OpenAPI spec and upload to watsonx Orchestrate\n    to enable the agent to \"know\" how to check for urgent cases.",
+        "operationId": "get_urgent_cases_api_v1_triage_api_urgent_cases_get",
+        "responses": {
+          "200": {
+            "description": "List of urgent triage cases",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UrgentCasesResponse"
+                },
+                "example": {
+                  "count": 2,
+                  "cases": [
+                    {
+                      "case_id": "triage_abc123",
+                      "patient_id": "101",
+                      "patient_name": "John Doe",
+                      "severity": "HIGH",
+                      "red_flags": [
+                        "breathing trouble"
+                      ],
+                      "symptoms": [
+                        "cough",
+                        "shortness of breath"
+                      ],
+                      "created_at": "2024-01-15T10:30:00Z",
+                      "status": "pending",
+                      "summary": "Patient John Doe has breathing trouble."
+                    }
+                  ],
+                  "retrieved_at": "2024-01-15T11:00:00Z"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/api/cases/{case_id}/seen": {
+      "post": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "Mark Case as Seen (Orchestrate API)",
+        "description": "**For IBM watsonx Orchestrate Integration**\n    \n    Mark a triage case as seen by the doctor.\n    \n    The AI agent calls this when a doctor says:\n    - \"Mark patient 101 as seen\"\n    - \"I've reviewed the urgent case\"\n    - \"Yes, mark them as seen\"\n    \n    **Parameters:**\n    - case_id: The triage case ID to mark as seen\n    - doctor_notes: Optional notes from the doctor",
+        "operationId": "mark_case_as_seen_api_v1_triage_api_cases__case_id__seen_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/MarkCaseSeenRequest"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkCaseSeenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/api/cases/{case_id}": {
+      "get": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "Get Case Details (Orchestrate API)",
+        "description": "**For IBM watsonx Orchestrate Integration**\n    \n    Get detailed information about a specific triage case.\n    \n    The AI agent calls this when asked:\n    - \"Tell me more about case ABC123\"\n    - \"What are the details for patient John's case?\"",
+        "operationId": "get_case_details_api_v1_triage_api_cases__case_id__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriageCaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/api/cases": {
+      "get": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "List Cases by Severity (Orchestrate API)",
+        "description": "**For IBM watsonx Orchestrate Integration**\n    \n    List triage cases filtered by severity level.\n    \n    The AI agent calls this when asked:\n    - \"Show me all medium priority cases\"\n    - \"How many low priority patients are waiting?\"",
+        "operationId": "list_cases_by_severity_api_v1_triage_api_cases_get",
+        "parameters": [
+          {
+            "name": "severity",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SeverityLevel"
+                }
+              ],
+              "description": "Filter by severity: HIGH, MEDIUM, or LOW",
+              "title": "Severity"
+            },
+            "description": "Filter by severity: HIGH, MEDIUM, or LOW"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/cases": {
+      "post": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "Create Manual Triage Case",
+        "description": "Create a triage case manually (bypassing voice/survey workflow)",
+        "operationId": "create_manual_triage_case_api_v1_triage_cases_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriageCaseCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriageCaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/triage/cases/{case_id}": {
+      "patch": {
+        "tags": [
+          "Voice Triage & Orchestrate"
+        ],
+        "summary": "Update Triage Case",
+        "description": "Update status or add notes to a triage case",
+        "operationId": "update_triage_case_api_v1_triage_cases__case_id__patch",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriageCaseUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriageCaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AppointmentCreate": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id",
+            "description": "Unique patient identifier"
+          },
+          "patient_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Patient Name"
+          },
+          "patient_email": {
+            "type": "string",
+            "title": "Patient Email",
+            "description": "Patient's email for survey delivery"
+          },
+          "doctor_id": {
+            "type": "string",
+            "title": "Doctor Id",
+            "description": "Assigned doctor identifier"
+          },
+          "doctor_name": {
+            "type": "string",
+            "title": "Doctor Name",
+            "description": "Doctor's display name"
+          },
+          "appointment_date": {
+            "type": "string",
+            "title": "Appointment Date",
+            "description": "Appointment date (YYYY-MM-DD)"
+          },
+          "appointment_time": {
+            "type": "string",
+            "title": "Appointment Time",
+            "description": "Appointment time (HH:MM)"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Reason for appointment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "patient_name",
+          "patient_email",
+          "doctor_id",
+          "doctor_name",
+          "appointment_date",
+          "appointment_time"
+        ],
+        "title": "AppointmentCreate",
+        "description": "Schema for creating a new appointment (triggers triage workflow)"
+      },
+      "AppointmentResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "appointment_id": {
+            "type": "string",
+            "title": "Appointment Id"
+          },
+          "survey_id": {
+            "type": "string",
+            "title": "Survey Id"
+          },
+          "email_sent": {
+            "type": "boolean",
+            "title": "Email Sent"
+          },
+          "workflow_status": {
+            "type": "string",
+            "title": "Workflow Status"
+          },
+          "next_step": {
+            "type": "string",
+            "title": "Next Step"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "appointment_id",
+          "survey_id",
+          "email_sent",
+          "workflow_status",
+          "next_step"
+        ],
+        "title": "AppointmentResponse",
+        "description": "Response after creating an appointment"
+      },
+      "AudioUploadRequest": {
+        "properties": {
+          "visit_id": {
+            "type": "string",
+            "title": "Visit Id"
+          },
+          "file_extension": {
+            "type": "string",
+            "title": "File Extension",
+            "default": "webm"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "default": "audio/webm"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id"
+        ],
+        "title": "AudioUploadRequest",
+        "description": "Request for audio upload URL"
+      },
+      "AudioUploadResponse": {
+        "properties": {
+          "upload_url": {
+            "type": "string",
+            "title": "Upload Url"
+          },
+          "audio_s3_key": {
+            "type": "string",
+            "title": "Audio S3 Key"
+          },
+          "expiration_seconds": {
+            "type": "integer",
+            "title": "Expiration Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload_url",
+          "audio_s3_key",
+          "expiration_seconds"
+        ],
+        "title": "AudioUploadResponse",
+        "description": "Response with presigned URL"
+      },
+      "Body_process_voice_triage_api_v1_triage_voice_post": {
+        "properties": {
+          "audio": {
+            "type": "string",
+            "format": "binary",
+            "title": "Audio",
+            "description": "Audio file from patient recording"
+          },
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id",
+            "description": "Patient identifier"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name",
+            "description": "Patient's full name"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "description": "Language code",
+            "default": "en-IN"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id",
+            "description": "Optional linked appointment ID"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio",
+          "patient_id",
+          "patient_name"
+        ],
+        "title": "Body_process_voice_triage_api_v1_triage_voice_post"
+      },
+      "DifferentialDiagnosis": {
+        "properties": {
+          "diagnosis": {
+            "type": "string",
+            "title": "Diagnosis"
+          },
+          "probability": {
+            "type": "string",
+            "title": "Probability"
+          },
+          "supporting_factors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supporting Factors"
+          },
+          "against": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Against"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Next Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "diagnosis",
+          "probability",
+          "supporting_factors",
+          "against",
+          "next_steps"
+        ],
+        "title": "DifferentialDiagnosis",
+        "description": "Single differential diagnosis"
+      },
+      "Gender": {
+        "type": "string",
+        "enum": [
+          "male",
+          "female",
+          "other"
+        ],
+        "title": "Gender"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LanguageCode": {
+        "type": "string",
+        "enum": [
+          "hi-IN",
+          "ta-IN",
+          "te-IN",
+          "mr-IN",
+          "bn-IN",
+          "en-IN"
+        ],
+        "title": "LanguageCode"
+      },
+      "MarkCaseSeenRequest": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id",
+            "description": "Triage case ID to mark as seen"
+          },
+          "doctor_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Notes",
+            "description": "Optional notes from the doctor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id"
+        ],
+        "title": "MarkCaseSeenRequest",
+        "description": "Request to mark a case as seen by the doctor"
+      },
+      "MarkCaseSeenResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Confirmation message for the AI agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "case_id",
+          "status",
+          "updated_at",
+          "message"
+        ],
+        "title": "MarkCaseSeenResponse",
+        "description": "Response after marking a case as seen"
+      },
+      "PatientCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Name"
+          },
+          "age": {
+            "type": "integer",
+            "maximum": 150.0,
+            "minimum": 0.0,
+            "title": "Age"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/Gender"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "language_preference": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LanguageCode"
+              }
+            ],
+            "default": "hi-IN"
+          },
+          "clinic_id": {
+            "type": "string",
+            "title": "Clinic Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "age",
+          "gender",
+          "phone",
+          "clinic_id"
+        ],
+        "title": "PatientCreate",
+        "description": "Schema for creating a new patient"
+      },
+      "PatientResponse": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "age": {
+            "type": "integer",
+            "title": "Age"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/Gender"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "language_preference": {
+            "$ref": "#/components/schemas/LanguageCode"
+          },
+          "clinic_id": {
+            "type": "string",
+            "title": "Clinic Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "name",
+          "age",
+          "gender",
+          "phone",
+          "language_preference",
+          "clinic_id",
+          "created_at"
+        ],
+        "title": "PatientResponse",
+        "description": "Schema for patient response"
+      },
+      "ProcessingStatusResponse": {
+        "properties": {
+          "visit_id": {
+            "type": "string",
+            "title": "Visit Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/VisitStatus"
+          },
+          "progress_percentage": {
+            "type": "integer",
+            "title": "Progress Percentage"
+          },
+          "current_step": {
+            "type": "string",
+            "title": "Current Step"
+          },
+          "estimated_completion_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Completion Seconds"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "status",
+          "progress_percentage",
+          "current_step",
+          "estimated_completion_seconds",
+          "error_message"
+        ],
+        "title": "ProcessingStatusResponse",
+        "description": "Status of audio processing"
+      },
+      "RedFlag": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "finding": {
+            "type": "string",
+            "title": "Finding"
+          },
+          "urgency": {
+            "type": "string",
+            "title": "Urgency"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "finding",
+          "urgency",
+          "action"
+        ],
+        "title": "RedFlag",
+        "description": "Red flag alert"
+      },
+      "RedFlagAnalysis": {
+        "properties": {
+          "has_red_flags": {
+            "type": "boolean",
+            "title": "Has Red Flags"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/RiskLevel"
+          },
+          "red_flags_detected": {
+            "items": {
+              "$ref": "#/components/schemas/RedFlag"
+            },
+            "type": "array",
+            "title": "Red Flags Detected"
+          },
+          "triage_recommendation": {
+            "type": "string",
+            "title": "Triage Recommendation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "has_red_flags",
+          "severity",
+          "red_flags_detected",
+          "triage_recommendation"
+        ],
+        "title": "RedFlagAnalysis",
+        "description": "Red flag analysis result"
+      },
+      "RiskLevel": {
+        "type": "string",
+        "enum": [
+          "ROUTINE",
+          "LOW",
+          "MODERATE",
+          "HIGH",
+          "URGENT",
+          "CRITICAL"
+        ],
+        "title": "RiskLevel"
+      },
+      "SOAPNote": {
+        "properties": {
+          "subjective": {
+            "type": "string",
+            "title": "Subjective",
+            "description": "Subjective findings from patient"
+          },
+          "objective": {
+            "type": "string",
+            "title": "Objective",
+            "description": "Objective findings and vitals"
+          },
+          "assessment": {
+            "type": "string",
+            "title": "Assessment",
+            "description": "Clinical assessment"
+          },
+          "plan": {
+            "type": "string",
+            "title": "Plan",
+            "description": "Treatment plan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subjective",
+          "objective",
+          "assessment",
+          "plan"
+        ],
+        "title": "SOAPNote",
+        "description": "SOAP Note structure"
+      },
+      "SeverityLevel": {
+        "type": "string",
+        "enum": [
+          "HIGH",
+          "MEDIUM",
+          "LOW"
+        ],
+        "title": "SeverityLevel",
+        "description": "Severity levels for triage classification"
+      },
+      "SurveyResponseResult": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "survey_id": {
+            "type": "string",
+            "title": "Survey Id"
+          },
+          "triage_case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Case Id"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeverityLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "red_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Red Flags",
+            "default": []
+          },
+          "ehr_updated": {
+            "type": "boolean",
+            "title": "Ehr Updated",
+            "default": false
+          },
+          "nurse_alerted": {
+            "type": "boolean",
+            "title": "Nurse Alerted",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "survey_id"
+        ],
+        "title": "SurveyResponseResult",
+        "description": "Result of processing a survey response"
+      },
+      "SurveyResponseSubmit": {
+        "properties": {
+          "survey_id": {
+            "type": "string",
+            "title": "Survey Id"
+          },
+          "response_text": {
+            "type": "string",
+            "title": "Response Text",
+            "description": "Free-form text response"
+          },
+          "answers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answers",
+            "description": "Question ID to answer mapping"
+          }
+        },
+        "type": "object",
+        "required": [
+          "survey_id",
+          "response_text"
+        ],
+        "title": "SurveyResponseSubmit",
+        "description": "Patient's response to a survey"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "clinic_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinic Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "user_id",
+          "name",
+          "role",
+          "clinic_id"
+        ],
+        "title": "TokenResponse",
+        "description": "Schema for authentication token response"
+      },
+      "TriageCaseCreate": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "symptoms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Symptoms",
+            "default": []
+          },
+          "medications": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Medications",
+            "default": []
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "patient_name"
+        ],
+        "title": "TriageCaseCreate",
+        "description": "Create a triage case manually (bypassing voice/survey)"
+      },
+      "TriageCaseResponse": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "symptoms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Symptoms"
+          },
+          "medications": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Medications"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          },
+          "severity_score": {
+            "$ref": "#/components/schemas/SeverityLevel"
+          },
+          "red_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Red Flags"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TriageStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "nurse_alerted": {
+            "type": "boolean",
+            "title": "Nurse Alerted"
+          },
+          "doctor_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "patient_id",
+          "patient_name",
+          "symptoms",
+          "medications",
+          "severity_score",
+          "red_flags",
+          "status",
+          "created_at",
+          "updated_at",
+          "nurse_alerted"
+        ],
+        "title": "TriageCaseResponse",
+        "description": "Triage case data returned by API"
+      },
+      "TriageCaseUpdate": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TriageStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doctor_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Notes"
+          }
+        },
+        "type": "object",
+        "title": "TriageCaseUpdate",
+        "description": "Update a triage case (e.g., add doctor notes)"
+      },
+      "TriageHealthCheck": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "services": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Services"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "services",
+          "timestamp"
+        ],
+        "title": "TriageHealthCheck",
+        "description": "Health check response for triage module"
+      },
+      "TriageStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "reviewed",
+          "seen"
+        ],
+        "title": "TriageStatus",
+        "description": "Status of a triage case"
+      },
+      "UrgentCaseItem": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id",
+            "description": "Unique triage case identifier"
+          },
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id",
+            "description": "Patient identifier"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name",
+            "description": "Patient's full name"
+          },
+          "severity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SeverityLevel"
+              }
+            ],
+            "description": "Severity level: HIGH, MEDIUM, or LOW"
+          },
+          "red_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Red Flags",
+            "description": "List of red flag symptoms detected"
+          },
+          "symptoms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Symptoms",
+            "description": "All symptoms reported"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "ISO timestamp when case was created"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Current case status"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Human-readable summary for the AI agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "patient_id",
+          "patient_name",
+          "severity",
+          "red_flags",
+          "symptoms",
+          "created_at",
+          "status",
+          "summary"
+        ],
+        "title": "UrgentCaseItem",
+        "description": "Individual urgent case for Orchestrate API\n\nThis is what the AI agent will receive when checking for urgent patients.",
+        "example": {
+          "case_id": "triage_abc123def456",
+          "created_at": "2024-01-15T10:30:00Z",
+          "patient_id": "patient_789",
+          "patient_name": "John Doe",
+          "red_flags": [
+            "breathing difficulty",
+            "chest pain"
+          ],
+          "severity": "HIGH",
+          "status": "pending",
+          "summary": "Patient John Doe has breathing difficulty, chest pain.",
+          "symptoms": [
+            "cough",
+            "fever",
+            "shortness of breath"
+          ]
+        }
+      },
+      "UrgentCasesResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Total number of urgent cases"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/UrgentCaseItem"
+            },
+            "type": "array",
+            "title": "Cases",
+            "description": "List of urgent triage cases"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At",
+            "description": "ISO timestamp of retrieval"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "cases",
+          "retrieved_at"
+        ],
+        "title": "UrgentCasesResponse",
+        "description": "Response for GET /api/urgent-cases\n\nThis is the main endpoint for watsonx Orchestrate to check urgent patients.\nThe agent will call this when the doctor asks \"Do we have any urgent patients waiting?\"",
+        "example": {
+          "cases": [
+            {
+              "case_id": "triage_abc123",
+              "created_at": "2024-01-15T10:30:00Z",
+              "patient_id": "101",
+              "patient_name": "John Doe",
+              "red_flags": [
+                "breathing trouble"
+              ],
+              "severity": "HIGH",
+              "status": "pending",
+              "summary": "Patient John Doe has breathing trouble.",
+              "symptoms": [
+                "cough",
+                "shortness of breath"
+              ]
+            }
+          ],
+          "count": 2,
+          "retrieved_at": "2024-01-15T11:00:00Z"
+        }
+      },
+      "UserLogin": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "UserLogin",
+        "description": "Schema for user login"
+      },
+      "UserRegister": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "title": "Password"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "clinic_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinic Id"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password",
+          "name",
+          "role"
+        ],
+        "title": "UserRegister",
+        "description": "Schema for user registration"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VisitCreate": {
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "clinic_id": {
+            "type": "string",
+            "title": "Clinic Id"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "language_code": {
+            "type": "string",
+            "title": "Language Code",
+            "default": "hi-IN"
+          },
+          "audio_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Duration Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "clinic_id"
+        ],
+        "title": "VisitCreate",
+        "description": "Schema for creating a new visit"
+      },
+      "VisitResponse": {
+        "properties": {
+          "visit_id": {
+            "type": "string",
+            "title": "Visit Id"
+          },
+          "patient_id": {
+            "type": "string",
+            "title": "Patient Id"
+          },
+          "clinic_id": {
+            "type": "string",
+            "title": "Clinic Id"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/VisitStatus"
+          },
+          "language_code": {
+            "type": "string",
+            "title": "Language Code"
+          },
+          "audio_s3_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio S3 Key"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          },
+          "translated_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translated Text"
+          },
+          "soap_note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SOAPNote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "differential_diagnosis": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DifferentialDiagnosis"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Differential Diagnosis"
+          },
+          "red_flags": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RedFlagAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "processing_time_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processing Time Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "patient_id",
+          "clinic_id",
+          "doctor_id",
+          "status",
+          "language_code",
+          "audio_s3_key",
+          "transcript",
+          "translated_text",
+          "soap_note",
+          "differential_diagnosis",
+          "red_flags",
+          "risk_level",
+          "created_at",
+          "updated_at",
+          "processing_time_seconds"
+        ],
+        "title": "VisitResponse",
+        "description": "Schema for visit response"
+      },
+      "VisitStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "PROCESSING",
+          "TRANSCRIBING",
+          "ANALYZING",
+          "COMPLETED",
+          "FAILED"
+        ],
+        "title": "VisitStatus"
+      },
+      "VisitSummary": {
+        "properties": {
+          "visit_id": {
+            "type": "string",
+            "title": "Visit Id"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "patient_age": {
+            "type": "integer",
+            "title": "Patient Age"
+          },
+          "chief_complaint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chief Complaint"
+          },
+          "status": {
+            "$ref": "#/components/schemas/VisitStatus"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "has_red_flags": {
+            "type": "boolean",
+            "title": "Has Red Flags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "patient_name",
+          "patient_age",
+          "chief_complaint",
+          "status",
+          "risk_level",
+          "created_at",
+          "has_red_flags"
+        ],
+        "title": "VisitSummary",
+        "description": "Condensed visit information for list views"
+      },
+      "VoiceTriageResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          },
+          "transcription_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcription Confidence"
+          },
+          "symptoms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Symptoms",
+            "default": []
+          },
+          "medications": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Medications",
+            "default": []
+          },
+          "severity_score": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeverityLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "red_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Red Flags",
+            "default": []
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "nurse_alerted": {
+            "type": "boolean",
+            "title": "Nurse Alerted",
+            "default": false
+          },
+          "ehr_updated": {
+            "type": "boolean",
+            "title": "Ehr Updated",
+            "default": false
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "VoiceTriageResponse",
+        "description": "Response from voice triage processing"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

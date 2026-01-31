@@ -1,0 +1,56 @@
+# Nidaan API - IBM Cloud Code Engine Ignore File
+# Files/folders that should not be uploaded during build
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment files (secrets are handled separately)
+.env
+.env.local
+.env.ibm
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test files
+tests/
+test_*.py
+*_test.py
+
+# Local development
+*.log
+*.sqlite
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Deployment scripts (not needed in container)
+deploy-*.ps1
+deploy-*.sh

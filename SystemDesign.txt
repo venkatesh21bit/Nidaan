@@ -1,0 +1,265 @@
+This is a comprehensive **System Design Document (SDD)** for **Nidaan.ai**, structured to the standard expected of a Senior Software Engineer or System Architect.
+
+It moves beyond "features" into **architecture patterns, trade-offs, data consistency, scalability strategies, and failure handling**.
+
+---
+
+# System Design Document: Nidaan.ai (Clinical Intelligence Platform)
+
+## 1. Requirement Analysis & Constraints
+
+Before architecture, we define the boundaries.
+
+### **Functional Requirements**
+
+1. **Patient Intake:** Mobile PWA must record vernacular audio (offline-first), compress, and upload reliably over 2G/3G networks.
+2. **AI Pipeline:** Asynchronous processing of Audio  Text  English Translation  RAG Lookup  Structured SOAP Note.
+3. **Doctor Dashboard:** Real-time push updates. When processing finishes, the doctor’s screen must update without a page refresh.
+4. **EHR Integration:** On-demand export of patient data to hospital systems via HL7/FHIR standards.
+
+### **Non-Functional Requirements (NFRs)**
+
+1. **Latency:**
+* *Dashboard Load:* < 200ms (P99).
+* *AI Processing:* < 30 seconds for a 2-minute audio clip.
+
+
+2. **Consistency:** Eventual consistency is acceptable for the dashboard, but **Strong Consistency** is required for the final saved medical record.
+3. **Availability:** 99.9% uptime (multi-AZ deployment).
+4. **Compliance:** Data localization (AWS `ap-south-1`), Encryption at Rest/Transit (AES-256), HIPAA/DPDP Act compliance.
+
+---
+
+## 2. High-Level Architecture (Event-Driven Microservices)
+
+We will use an **Event-Driven Architecture** to decouple the heavy AI processing from the user-facing API. This prevents "timeout" errors during long LLM inferences.
+
+**Core Pattern:** **CQRS (Command Query Responsibility Segregation)**. The "Write" path (ingesting audio) is separate from the "Read" path (doctor viewing notes).
+
+```mermaid
+graph TD
+    %% --- Styles ---
+    classDef client fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef lb fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    classDef service fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef worker fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef db fill:#eceff1,stroke:#37474f,stroke-width:2px
+    classDef queue fill:#ffebee,stroke:#c62828,stroke-width:2px
+
+    %% Clients
+    subgraph Clients
+        PWA[Patient Mobile PWA]:::client
+        DocDash[Doctor Dashboard]:::client
+    end
+
+    %% Edge
+    CDN[AWS CloudFront] --> S3_Static[S3 Web Assets]
+    PWA --> CDN
+    DocDash --> CDN
+
+    %% Entry
+    API_GW[AWS API Gateway]:::lb
+    PWA -->|"REST / Upload"| API_GW
+    DocDash -->|"WSS / GraphQL"| API_GW
+
+    %% Auth
+    Cognito[AWS Cognito]:::service
+    API_GW -.->|"Validate JWT"| Cognito
+
+    %% Services Layer
+    subgraph Services ["Compute Layer (ECS Fargate / Lambda)"]
+        Ingest_Svc[Ingestion Service]:::service
+        Patient_Svc[Patient Data Service]:::service
+        Notif_Svc[Notification Service]:::service
+    end
+
+    API_GW --> Ingest_Svc
+    API_GW --> Patient_Svc
+
+    %% Async Processing
+    SQS_Main[SQS: AudioProcessQueue]:::queue
+    Ingest_Svc -->|"1. Push Job"| SQS_Main
+    
+    subgraph AI_Workers ["Async Worker Layer"]
+        Orchestrator[AI Orchestrator Worker]:::worker
+        Bedrock[AWS Bedrock]:::worker
+        Transcribe[AWS Transcribe]:::worker
+        OpenSearch[Vector DB]:::db
+    end
+
+    SQS_Main --> Orchestrator
+    Orchestrator --> Transcribe
+    Orchestrator --> Bedrock
+    Bedrock <-->|"RAG Lookup"| OpenSearch
+
+    %% Persistence
+    DynamoDB[(DynamoDB Table)]:::db
+    S3_Raw[(S3 Raw Audio)]:::db
+    
+    Ingest_Svc -->|"Presigned URL"| S3_Raw
+    PWA -.->|"Direct Upload"| S3_Raw
+    
+    Orchestrator -->|"2. Save Note"| DynamoDB
+    Patient_Svc --> DynamoDB
+
+    %% Real-time Loop
+    DynamoDBStreams[DynamoDB Streams]
+    DynamoDB --> DynamoDBStreams
+    DynamoDBStreams -->|"Trigger"| Notif_Svc
+    Notif_Svc -->|"3. Push Update"| DocDash
+
+
+```
+
+---
+
+## 3. Detailed Component Design
+
+### **A. The "Offline-First" Patient PWA**
+
+* **Challenge:** 3G networks in rural India are unstable. Streaming audio via WebSocket (like Siri) will fail.
+* **Solution:** **Store-and-Forward**.
+1. **Local Recording:** Use `MediaRecorder API` to record audio locally in the browser (IndexedDB).
+2. **Compression:** Transcode raw WAV to **Opus/WebM** client-side (reduces size by 90%).
+3. **Chunked Upload:** Request a **Presigned URL** from `Ingestion Service` and upload directly to S3.
+4. **Resiliency:** If upload fails, Service Worker retries automatically when connectivity returns (Background Sync API).
+
+
+
+### **B. The "Ingestion Service" (Write Path)**
+
+* **Role:** Stateless entry point.
+* **Tech:** Python FastAPI (deployed on AWS Lambda for scale-to-zero).
+* **Workflow:**
+1. Authenticates request (Cognito).
+2. Generates S3 Presigned URL (Time-to-live: 10 mins).
+3. Creates a "Visit Record" in DynamoDB with status `PROCESSING`.
+4. Pushes a message to **SQS (Simple Queue Service)** with `visit_id` and `s3_key`.
+5. Returns `202 Accepted` to the client immediately.
+
+
+
+### **C. The "AI Orchestrator" (The Worker)**
+
+* **Role:** The heavy lifter. It polls SQS and executes the DAG (Directed Acyclic Graph) of AI tasks.
+* **Why not Step Functions?** For MVP, a Lambda/Fargate worker is cheaper/simpler. For Scale, migrate to **AWS Step Functions**.
+* **RAG Implementation Detail:**
+* *Query:* "Chest pain radiating to left arm."
+* *Vector Search:* Queries **AWS OpenSearch Serverless** (k-NN algorithm) against indexed SNOMED-CT descriptions.
+* *Context Window:* Retrieves top 5 chunks.
+* *Prompt Construction:* `System: "You are a clinical assistant. Use these retrieved facts: {context}. Translate and Summarize this patient audio: {transcript}."`
+
+
+
+### **D. The Real-Time Feedback Loop**
+
+* **Challenge:** How does the doctor know the note is ready without refreshing?
+* **Solution:** **DynamoDB Streams + AWS AppSync (GraphQL)**.
+1. Worker updates DynamoDB status to `COMPLETED`.
+2. DynamoDB Stream triggers a Lambda.
+3. Lambda pushes a mutation to **AWS AppSync**.
+4. AppSync pushes data via WebSocket to the Doctor's Dashboard subscription.
+
+
+
+---
+
+## 4. Data Model & Schema Design
+
+We use a **Polyglot Persistence** strategy.
+
+### **1. Operational Data (DynamoDB)**
+
+* **Pattern:** Single Table Design (Adjacency List) for speed.
+* **Partition Key (PK):** `CLINIC#{clinic_id}`
+* **Sort Key (SK):** `VISIT#{timestamp}#{patient_id}`
+
+| PK | SK | Data (Attributes) | GSI_1_PK (Patient Lookup) |
+| --- | --- | --- | --- |
+| `CLINIC#101` | `METADATA` | `{Name: "City Clinic", Plan: "Pro"}` | - |
+| `CLINIC#101` | `VISIT#2025-01-27#PAT-55` | `{Status: "COMPLETED", Summary: "...", Risk: "High"}` | `PATIENT#55` |
+| `CLINIC#101` | `DOC#DR-RAM` | `{Name: "Dr. Ram", Speciality: "Cardio"}` | - |
+
+### **2. Identity & Relationships (PostgreSQL - Optional)**
+
+* If complex relational queries are needed (e.g., "Find all clinics in Tamil Nadu managed by Admin X"), use **Aurora Serverless (PostgreSQL)**. For MVP, DynamoDB is sufficient.
+
+### **3. Vector Store (OpenSearch)**
+
+* **Index:** `medical_knowledge`
+* **Fields:** `snomed_code` (keyword), `description_vector` (dense_vector, dim=1536), `clinical_guideline_text` (text).
+
+---
+
+## 5. Security & Compliance (Senior Level Considerations)
+
+1. **Tenant Isolation:**
+* **Logical Isolation:** Every DynamoDB item has `clinic_id`. IAM policies restrict Doctors to only access rows starting with their `CLINIC#`.
+
+
+2. **PII Redaction:**
+* Before sending text to any "Third Party" (if using external LLMs), run a **PII Redaction Layer** (using AWS Comprehend Medical) to mask Names/Phones. Since we use Bedrock (private copy), this is less critical but good practice.
+
+
+3. **Data Residency:**
+* Terraform scripts must hardcode `region = "ap-south-1"` (Mumbai).
+
+
+4. **Audit Trails:**
+* Enable **AWS CloudTrail** for all API actions.
+* Store "Access Logs" (Who viewed Patient X?) in **S3 Glacier** (Immutable Vault Lock) for 7 years (legal requirement).
+
+
+
+---
+
+## 6. Scalability & Resilience
+
+### **Handling "The Monday Morning Spike"**
+
+* **Problem:** Monday 9 AM, 500 clinics start simultaneously.
+* **Strategy:**
+* **Queue-Based Leveling:** SQS absorbs the burst. The Dashboard shows "Processing..." (async).
+* **Auto-Scaling:** Configure **Provisioned Concurrency** on Lambda or Auto-Scaling Group on ECS Fargate based on `ApproximateNumberOfMessagesVisible` in SQS.
+
+
+
+### **Circuit Breaker Pattern**
+
+* If `AWS Transcribe` or `Bedrock` starts timing out (latency > 30s), the Worker should **Trip the Circuit**:
+* Stop calling the AI API.
+* Return a "Service Degraded" status to the dashboard (e.g., "Audio saved, transcription pending").
+* Retry later using **Exponential Backoff**.
+
+
+
+---
+
+## 7. Deployment Strategy (DevOps)
+
+We treat infrastructure as code.
+
+* **IaC:** **Terraform** or **AWS CDK (TypeScript)**.
+* **CI/CD Pipeline (GitHub Actions):**
+1. **Commit:** Developer pushes code.
+2. **Test:** Unit tests (PyTest) + Linting.
+3. **Build:** Containerize Python services (Docker) -> ECR.
+4. **Deploy (Dev):** `terraform apply` to Dev environment.
+5. **Integration Test:** Run end-to-end synthetic transaction.
+6. **Deploy (Prod):** Manual approval gate -> Blue/Green deployment to Lambda.
+
+
+
+---
+
+### **Summary of Tech Stack Choices**
+
+| Component | Choice | Reason |
+| --- | --- | --- |
+| **Compute** | **AWS Lambda** | Cost-effective (pay-per-request), handles spiky hospital traffic well. |
+| **Orchestration** | **AWS Step Functions** | Visualizing the AI workflow, robust error handling/retries without code. |
+| **API** | **GraphQL (AppSync)** | Reduces network chatter (over-fetching) on slow hospital networks. |
+| **LLM** | **Claude 3.5 (Bedrock)** | Superior clinical reasoning compared to GPT-3.5; AWS BAA eligible. |
+| **Database** | **DynamoDB** | Single-digit ms latency; scales infinitely without DBA management. |
+
+This design ensures the system is **robust** (offline support), **scalable** (serverless), **secure** (compliance focused), and **cost-efficient** (pay-as-you-go).
