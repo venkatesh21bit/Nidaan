@@ -183,6 +183,15 @@ export default function AdminDashboard() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => router.push('/admin/agents')}
+              className="border-purple-600 text-purple-400 hover:bg-purple-900/50"
+            >
+              <Bot size={14} className="mr-1" />
+              🤖 AI Agents
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={fetchData}
               className="border-slate-600 text-slate-200 hover:bg-slate-700"
             >

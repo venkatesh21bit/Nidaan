@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/lib/store'
 import { doctorAPI } from '@/lib/api'
-import { ArrowLeft, AlertTriangle, CheckCircle2, Activity, FileText } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, CheckCircle2, Activity, FileText, CheckSquare, Loader2 } from 'lucide-react'
 
 export default function VisitDetailPage() {
   const router = useRouter()
@@ -17,6 +17,8 @@ export default function VisitDetailPage() {
   const [visit, setVisit] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('soap')
+  const [marking, setMarking] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user || (user.role !== 'doctor' && user.role !== 'admin')) {
@@ -31,12 +33,39 @@ export default function VisitDetailPage() {
 
   const fetchVisitDetails = async () => {
     try {
+      setError(null)
       const data = await doctorAPI.getVisitDetails(visitId)
       setVisit(data)
       setLoading(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching visit details:', error)
+      setError(error?.response?.data?.detail || 'Failed to load visit details')
       setLoading(false)
+    }
+  }
+
+  const handleMarkComplete = async () => {
+    setMarking(true)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://nidaan-api.25r5a6g2yvmy.eu-de.codeengine.appdomain.cloud/api/v1'}/doctors/visits/${visitId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+        },
+        body: JSON.stringify({ status: 'COMPLETED' })
+      })
+      
+      if (response.ok) {
+        setVisit((prev: any) => ({ ...prev, status: 'COMPLETED' }))
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to update')
+      }
+    } catch (error) {
+      console.error('Error marking complete:', error)
+    } finally {
+      setMarking(false)
     }
   }
 
@@ -57,7 +86,8 @@ export default function VisitDetailPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="text-center">
-          <p className="text-red-400">Visit not found</p>
+          <p className="text-red-400 mb-2">Visit not found</p>
+          {error && <p className="text-sm text-slate-400 mb-4 max-w-md">{error}</p>}
           <Button onClick={() => router.push('/doctor/dashboard')} className="mt-4 bg-blue-600 hover:bg-blue-700 text-white">
             Back to Dashboard
           </Button>
@@ -84,9 +114,42 @@ export default function VisitDetailPage() {
               <h1 className="text-2xl font-bold text-white">Visit Details</h1>
               <p className="text-sm text-slate-400">Visit ID: {visit.visit_id}</p>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-slate-400">Patient</div>
-              <div className="font-semibold text-white">{visit.patient_id}</div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-sm text-slate-400">Patient</div>
+                <div className="font-semibold text-white">{visit.patient_id}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-slate-400">Status</div>
+                <div className={`font-semibold ${visit.status === 'COMPLETED' ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {visit.status}
+                </div>
+              </div>
+              {visit.status !== 'COMPLETED' && (
+                <Button 
+                  onClick={handleMarkComplete}
+                  disabled={marking}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {marking ? (
+                    <>
+                      <Loader2 size={16} className="mr-2 animate-spin" />
+                      Marking...
+                    </>
+                  ) : (
+                    <>
+                      <CheckSquare size={16} className="mr-2" />
+                      Mark as Complete
+                    </>
+                  )}
+                </Button>
+              )}
+              {visit.status === 'COMPLETED' && (
+                <div className="flex items-center px-3 py-2 bg-green-900/30 border border-green-700 rounded text-green-400">
+                  <CheckCircle2 size={16} className="mr-2" />
+                  Reviewed
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ Doctor dashboard endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Dict, Optional
+from pydantic import BaseModel
 import logging
 from datetime import datetime, timedelta
 
@@ -26,7 +27,7 @@ async def get_dashboard_visits(
     Returns a list of visits with summary information, sorted by creation time
     """
     try:
-        clinic_id = current_user.get('clinic_id')
+        clinic_id = current_user.get('clinic_id', 'CLINIC_DEMO')
         
         # Get visits from database
         visits = db_client.list_clinic_visits(clinic_id, limit=limit)
@@ -85,6 +86,36 @@ async def get_visit_details(
         # Convert to response format
         from app.schemas.medical import SOAPNote, DifferentialDiagnosis, RedFlagAnalysis, RedFlag
         
+        # Transform differential diagnosis data to match schema
+        def transform_differential(dd_list):
+            if not dd_list:
+                return None
+            transformed = []
+            for dd in dd_list:
+                # Handle different field names (condition vs diagnosis, etc.)
+                transformed.append(DifferentialDiagnosis(
+                    diagnosis=dd.get('diagnosis') or dd.get('condition') or 'Unknown',
+                    probability=str(dd.get('probability', 'MEDIUM')) if isinstance(dd.get('probability'), (int, float)) else dd.get('probability', 'MEDIUM'),
+                    supporting_factors=dd.get('supporting_factors') or dd.get('supporting', []) or ['Based on symptoms'],
+                    against=dd.get('against') or dd.get('against_factors', []) or ['Requires confirmation'],
+                    next_steps=dd.get('next_steps') or dd.get('recommendations', []) or ['Clinical evaluation']
+                ))
+            return transformed
+        
+        # Transform red flags data
+        def transform_red_flags(rf_list):
+            if not rf_list:
+                return []
+            transformed = []
+            for rf in rf_list:
+                transformed.append(RedFlag(
+                    category=rf.get('category', 'General'),
+                    finding=rf.get('finding') or rf.get('description', 'Alert'),
+                    urgency=rf.get('urgency', 'ROUTINE'),
+                    action=rf.get('action') or rf.get('recommendation', 'Evaluate')
+                ))
+            return transformed
+        
         return VisitResponse(
             visit_id=visit.get('visit_id'),
             patient_id=visit.get('patient_id'),
@@ -96,11 +127,11 @@ async def get_visit_details(
             transcript=visit.get('transcript'),
             translated_text=visit.get('translated_text'),
             soap_note=SOAPNote(**visit.get('soap_note')) if visit.get('soap_note') else None,
-            differential_diagnosis=[DifferentialDiagnosis(**dd) for dd in visit.get('differential_diagnosis', [])] if visit.get('differential_diagnosis') else None,
+            differential_diagnosis=transform_differential(visit.get('differential_diagnosis')),
             red_flags=RedFlagAnalysis(
                 has_red_flags=visit.get('red_flags', {}).get('has_red_flags', False),
                 severity=visit.get('red_flags', {}).get('severity', 'ROUTINE'),
-                red_flags_detected=[RedFlag(**rf) for rf in visit.get('red_flags', {}).get('red_flags_detected', [])],
+                red_flags_detected=transform_red_flags(visit.get('red_flags', {}).get('red_flags_detected', [])),
                 triage_recommendation=visit.get('red_flags', {}).get('triage_recommendation', '')
             ) if visit.get('red_flags') else None,
             risk_level=visit.get('risk_level'),
@@ -169,6 +200,85 @@ async def get_dashboard_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch statistics: {str(e)}"
+        )
+
+
+class VisitUpdateRequest(BaseModel):
+    """Schema for updating visit status"""
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.patch("/visits/{visit_id}")
+async def update_visit_status(
+    visit_id: str,
+    update_data: VisitUpdateRequest,
+    current_user: Dict = Depends(require_role(["doctor", "admin"]))
+):
+    """
+    Update visit status (e.g., mark as completed)
+    
+    Doctors can mark visits as reviewed/completed
+    """
+    try:
+        clinic_id = current_user.get('clinic_id', 'CLINIC_DEMO')
+        
+        # Get all visits and find the specific one
+        visits = db_client.list_clinic_visits(clinic_id, limit=100)
+        visit = next((v for v in visits if v.get('visit_id') == visit_id), None)
+        
+        if not visit:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Visit {visit_id} not found"
+            )
+        
+        # Build updates
+        updates = {}
+        if update_data.status:
+            # Validate status
+            valid_statuses = ['PENDING', 'PROCESSING', 'COMPLETED', 'REVIEWED']
+            if update_data.status.upper() not in valid_statuses:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status. Must be one of: {valid_statuses}"
+                )
+            updates['status'] = update_data.status.upper()
+        
+        if update_data.notes:
+            updates['doctor_notes'] = update_data.notes
+        
+        if not updates:
+            return {"message": "No updates provided", "visit_id": visit_id}
+        
+        # Update in database
+        visit_sk = visit.get('SK')
+        if visit_sk:
+            updated_visit = db_client.update_visit(clinic_id, visit_sk, updates)
+            logger.info(f"Visit {visit_id} updated: {updates}")
+            return {
+                "message": "Visit updated successfully",
+                "visit_id": visit_id,
+                "updates": updates
+            }
+        else:
+            # For in-memory DB, update the dict directly
+            for key, value in updates.items():
+                visit[key] = value
+            visit['updated_at'] = datetime.utcnow().isoformat()
+            return {
+                "message": "Visit updated successfully",
+                "visit_id": visit_id,
+                "updates": updates
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating visit: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update visit: {str(e)}"
         )
 
 

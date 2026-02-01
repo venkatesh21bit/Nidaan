@@ -105,6 +105,125 @@ async def websocket_endpoint(
         manager.disconnect(websocket, clinic_id)
 
 
+# ==================== Patient Chat WebSocket ====================
+
+# In-memory conversation storage for WebSocket chat
+_ws_conversations: Dict[str, list] = {}
+_ws_collected_data: Dict[str, Dict] = {}
+
+
+@router.websocket("/ws/patient/chat")
+async def patient_chat_websocket(
+    websocket: WebSocket,
+    token: str = Query(None)
+):
+    """
+    WebSocket endpoint for real-time patient symptom chat
+    
+    Protocol:
+    - Client sends: {"type": "message", "content": "I have a headache"}
+    - Server responds: {"type": "response", "content": "...", "symptoms": [...], "severity": "..."}
+    """
+    user_id = "anonymous"
+    
+    # Validate token
+    if token:
+        try:
+            from app.core.security import decode_access_token
+            payload = decode_access_token(token)
+            user_id = payload.get('user_id', 'anonymous')
+        except Exception as e:
+            logger.warning(f"WebSocket token validation failed: {e}")
+    
+    await websocket.accept()
+    logger.info(f"Patient chat WebSocket connected: {user_id}")
+    
+    # Initialize conversation data for this user
+    if user_id not in _ws_collected_data:
+        _ws_collected_data[user_id] = {
+            'symptoms': [],
+            'duration': None,
+            'severity': None,
+            'location': None,
+            'associated_symptoms': [],
+        }
+    if user_id not in _ws_conversations:
+        _ws_conversations[user_id] = []
+    
+    # Send welcome message
+    await websocket.send_json({
+        "type": "connected",
+        "message": "Connected to AI Health Assistant",
+        "user_id": user_id
+    })
+    
+    try:
+        while True:
+            data = await websocket.receive_text()
+            
+            try:
+                message_data = json.loads(data)
+            except json.JSONDecodeError:
+                message_data = {"type": "message", "content": data}
+            
+            msg_type = message_data.get("type", "message")
+            
+            if msg_type == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+            
+            if msg_type == "message":
+                content = message_data.get("content", "")
+                
+                # Process the message
+                from app.api.v1.patients import _process_patient_message, ChatMessage
+                
+                history = [ChatMessage(role=m['role'], content=m['content']) 
+                          for m in _ws_conversations[user_id][-10:]]
+                
+                response, follow_ups, severity = await _process_patient_message(
+                    content.lower(), history, _ws_collected_data[user_id]
+                )
+                
+                # Store conversation
+                _ws_conversations[user_id].append({'role': 'user', 'content': content})
+                _ws_conversations[user_id].append({'role': 'assistant', 'content': response})
+                
+                # Send response
+                await websocket.send_json({
+                    "type": "response",
+                    "content": response,
+                    "symptoms": _ws_collected_data[user_id]['symptoms'],
+                    "severity": severity,
+                    "follow_up_questions": follow_ups,
+                    "collected_data": {
+                        "duration": _ws_collected_data[user_id].get('duration'),
+                        "location": _ws_collected_data[user_id].get('location'),
+                        "associated": _ws_collected_data[user_id].get('associated_symptoms', [])
+                    }
+                })
+            
+            elif msg_type == "reset":
+                # Reset conversation
+                _ws_collected_data[user_id] = {
+                    'symptoms': [],
+                    'duration': None,
+                    'severity': None,
+                    'location': None,
+                    'associated_symptoms': [],
+                }
+                _ws_conversations[user_id] = []
+                await websocket.send_json({
+                    "type": "reset_complete",
+                    "message": "Conversation reset. How can I help you today?"
+                })
+                
+    except WebSocketDisconnect:
+        logger.info(f"Patient chat WebSocket disconnected: {user_id}")
+    except Exception as e:
+        logger.error(f"Patient chat WebSocket error: {str(e)}")
+
+
 async def notify_visit_update(clinic_id: str, visit_id: str, status: str, data: dict = None):
     """
     Notify all connected clients about a visit update

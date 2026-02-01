@@ -40,7 +40,9 @@ export default function LoginPage() {
       )
 
       // Redirect based on role
-      if (response.role === 'doctor' || response.role === 'admin') {
+      if (response.role === 'admin') {
+        router.push('/admin/appointments')
+      } else if (response.role === 'doctor') {
         router.push('/doctor/dashboard')
       } else {
         router.push('/patient')
@@ -117,10 +119,56 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <div className="mt-4 p-3 bg-slate-700/50 rounded text-sm border border-slate-600">
-            <p className="font-semibold mb-1 text-white">Demo Accounts:</p>
-            <p className="text-slate-300">Doctor: doctor@nidaan.ai / doctor123</p>
-            <p className="text-slate-300">Patient: patient@nidaan.ai / patient123</p>
+          {/* Demo Credentials Section */}
+          <div className="mt-6 space-y-3">
+            <div className="p-4 bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-lg border border-blue-700/50">
+              <p className="font-semibold mb-3 text-white text-center">🔐 Demo Credentials</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded">
+                  <span className="text-slate-300">👨‍⚕️ Doctor</span>
+                  <code className="text-blue-400">doctor@nidaan.ai / doctor123</code>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded">
+                  <span className="text-slate-300">🤒 Patient</span>
+                  <code className="text-green-400">patient@nidaan.ai / patient123</code>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded">
+                  <span className="text-slate-300">👑 Admin</span>
+                  <code className="text-purple-400">admin@nidaan.ai / admin123</code>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Triage Departments Info */}
+            <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+              <p className="font-semibold mb-2 text-white text-sm">🏥 AI Triage Departments</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                  <span className="text-slate-400">Cardiac - Chest/Heart</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  <span className="text-slate-400">Respiratory - Breathing</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                  <span className="text-slate-400">Gastro - Stomach</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                  <span className="text-slate-400">Neuro - Brain/Nerve</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                  <span className="text-slate-400">Ortho - Bone/Joint</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span className="text-slate-400">General - Others</span>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

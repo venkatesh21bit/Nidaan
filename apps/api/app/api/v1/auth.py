@@ -120,6 +120,8 @@ async def login(credentials: UserLogin):
         
         # Mock user data (in production, fetch from DB)
         if credentials.email == "doctor@nidaan.ai":
+            if credentials.password != "doctor123":
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
             user_data = {
                 "user_id": "USR_DEMO_DOC",
                 "email": credentials.email,
@@ -128,11 +130,23 @@ async def login(credentials: UserLogin):
                 "clinic_id": "CLINIC_DEMO"
             }
         elif credentials.email == "patient@nidaan.ai":
+            if credentials.password != "patient123":
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
             user_data = {
                 "user_id": "USR_DEMO_PAT",
                 "email": credentials.email,
                 "name": "Patient Demo",
                 "role": "patient",
+                "clinic_id": "CLINIC_DEMO"
+            }
+        elif credentials.email == "admin@nidaan.ai":
+            if credentials.password != "admin123":
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            user_data = {
+                "user_id": "USR_DEMO_ADMIN",
+                "email": credentials.email,
+                "name": "Admin User",
+                "role": "admin",
                 "clinic_id": "CLINIC_DEMO"
             }
         else:
