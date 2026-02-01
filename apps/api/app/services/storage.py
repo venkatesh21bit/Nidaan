@@ -205,17 +205,24 @@ class InMemoryStorageService:
     
     def generate_presigned_upload_url(self, patient_id: str, visit_id: str, 
                                       file_extension: str = "webm") -> Dict[str, str]:
-        """Generate mock upload URL for development"""
+        """Generate mock upload URL for demo mode"""
         import uuid
         object_key = f"audio/{patient_id}/{visit_id}/{uuid.uuid4()}.{file_extension}"
         return {
-            "upload_url": f"http://localhost:8000/api/v1/audio/mock-upload/{object_key}",
+            "upload_url": f"MOCK_UPLOAD:{object_key}",
             "object_key": object_key
         }
     
+    def generate_presigned_url(self, object_key: str, expiration: int = None, operation: str = 'put_object') -> str:
+        """Generate mock presigned URL for development - compatible with S3StorageService interface"""
+        # For deployed environments, we'll skip the actual upload and just simulate it
+        # The URL will be to our own mock endpoint
+        # We use a special marker that the frontend will detect
+        return f"MOCK_UPLOAD:{object_key}"
+    
     def generate_presigned_download_url(self, object_key: str, expiration: int = None) -> str:
         """Generate mock download URL"""
-        return f"http://localhost:8000/api/v1/audio/mock-download/{object_key}"
+        return f"MOCK_DOWNLOAD:{object_key}"
     
     async def delete_audio(self, object_key: str) -> bool:
         """Delete file from memory"""
@@ -225,8 +232,8 @@ class InMemoryStorageService:
         return False
     
     def get_file_url(self, object_key: str) -> str:
-        """Get mock file URL"""
-        return f"http://localhost:8000/api/v1/audio/files/{object_key}"
+        """Get mock file URL - returns marker for demo mode"""
+        return f"MOCK_FILE:{object_key}"
 
 
 # Union type for both storage services

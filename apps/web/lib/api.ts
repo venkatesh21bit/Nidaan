@@ -68,6 +68,8 @@ export interface Visit {
   patient_age?: number
   patient_gender?: string
   chief_complaint?: string
+  has_red_flags?: boolean
+  reviewed_at?: string
 }
 
 export interface UploadUrlResponse {
@@ -322,7 +324,15 @@ export const triageAPI = {
 }
 
 // Upload file directly to S3 using presigned URL
+// For demo/mock mode (no S3 configured), the URL will be "MOCK_UPLOAD:key" and we skip upload
 export const uploadToS3 = async (presignedUrl: string, file: Blob): Promise<void> => {
+  // Handle mock upload for demo environments
+  if (presignedUrl.startsWith('MOCK_UPLOAD:')) {
+    console.log('[Demo Mode] Skipping S3 upload, audio recorded locally')
+    // In demo mode, we simulate successful upload
+    return
+  }
+  
   await axios.put(presignedUrl, file, {
     headers: {
       'Content-Type': file.type,

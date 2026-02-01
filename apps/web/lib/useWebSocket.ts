@@ -4,7 +4,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useAuthStore } from './store'
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/api/v1/ws'
+// Use deployed API WebSocket URL, falling back to localhost for development
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'wss://nidaan-api.25r5a6g2yvmy.eu-de.codeengine.appdomain.cloud/api/v1/ws'
 
 interface WebSocketMessage {
   type: 'visit_update' | 'red_flag_alert' | 'pong'

@@ -35,3 +35,86 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* AI Voice Orb Animations */
+@keyframes voice-wave-1 {
+  0%, 100% { transform: scaleY(0.5); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes voice-wave-2 {
+  0%, 100% { transform: scaleY(0.7); }
+  50% { transform: scaleY(0.4); }
+}
+
+@keyframes voice-wave-3 {
+  0%, 100% { transform: scaleY(0.6); }
+  50% { transform: scaleY(1.2); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 30px rgba(56, 189, 248, 0.6),
+                0 0 60px rgba(14, 165, 233, 0.4),
+                0 0 90px rgba(14, 165, 233, 0.2);
+  }
+  50% { 
+    box-shadow: 0 0 50px rgba(56, 189, 248, 0.8),
+                0 0 80px rgba(14, 165, 233, 0.6),
+                0 0 120px rgba(14, 165, 233, 0.4);
+  }
+}
+
+.animate-voice-wave-1 {
+  animation: voice-wave-1 0.8s ease-in-out infinite;
+}
+
+.animate-voice-wave-2 {
+  animation: voice-wave-2 0.6s ease-in-out infinite;
+}
+
+.animate-voice-wave-3 {
+  animation: voice-wave-3 0.7s ease-in-out infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Chat message animations */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Typing indicator */
+@keyframes typing-dot {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+.typing-dot-1 { animation: typing-dot 1s infinite 0s; }
+.typing-dot-2 { animation: typing-dot 1s infinite 0.15s; }
+.typing-dot-3 { animation: typing-dot 1s infinite 0.3s; }

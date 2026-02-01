@@ -119,8 +119,8 @@ export default function LoginPage() {
 
           <div className="mt-4 p-3 bg-slate-700/50 rounded text-sm border border-slate-600">
             <p className="font-semibold mb-1 text-white">Demo Accounts:</p>
-            <p className="text-slate-300">Doctor: doctor@nidaan.ai / password</p>
-            <p className="text-slate-300">Patient: patient@nidaan.ai / password</p>
+            <p className="text-slate-300">Doctor: doctor@nidaan.ai / doctor123</p>
+            <p className="text-slate-300">Patient: patient@nidaan.ai / patient123</p>
           </div>
         </CardContent>
       </Card>

@@ -2,7 +2,7 @@
 Main API Router - Aggregates all route modules
 """
 from fastapi import APIRouter
-from app.api.v1 import audio, patients, doctors, websocket, demo, triage
+from app.api.v1 import audio, patients, doctors, websocket, demo, triage, admin
 
 api_router = APIRouter()
 
@@ -13,6 +13,7 @@ api_router.include_router(doctors.router)
 api_router.include_router(websocket.router)
 api_router.include_router(demo.router)  # Demo/dev endpoints
 api_router.include_router(triage.router)  # Voice Triage & Orchestrate API
+api_router.include_router(admin.router)  # Admin dashboard & AI agents
 
 
 @api_router.get("/health")

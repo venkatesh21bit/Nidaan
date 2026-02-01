@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuthStore } from '@/lib/store'
 import { doctorAPI, Visit, DashboardStats } from '@/lib/api'
 import { useWebSocket } from '@/lib/useWebSocket'
+import { AIAgentChat } from '@/components/ai-agent-chat'
 import { AlertCircle, Clock, Users, Activity, Eye, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 
 export default function DoctorDashboard() {
@@ -317,6 +318,12 @@ export default function DoctorDashboard() {
           </CardContent>
         </Card>
       </main>
+
+      {/* AI Agent Chat */}
+      <AIAgentChat 
+        clinicId={user?.clinic_id}
+        onVisitSelect={(visitId) => router.push(`/doctor/visit/${visitId}`)}
+      />
     </div>
   )
 }

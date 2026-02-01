@@ -25,11 +25,15 @@ class MedicalRAGChain:
         """Initialize Bedrock client and vector store"""
         client_config = {'region_name': settings.AWS_REGION}
         
-        if settings.ENV == 'development':
+        # Use mock mode if in development OR if AWS credentials are not configured
+        # This allows demo mode in production without real AWS Bedrock
+        if settings.ENV == 'development' or not settings.AWS_ACCESS_KEY_ID:
             self.mock_mode = True
+            logger.info("MedicalRAGChain initialized in mock mode (demo)")
         else:
             self.mock_mode = False
             self.bedrock_client = boto3.client('bedrock-runtime', **client_config)
+            logger.info("MedicalRAGChain initialized with AWS Bedrock")
         
         self.model_id = settings.BEDROCK_MODEL_ID
     

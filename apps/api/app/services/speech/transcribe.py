@@ -22,12 +22,15 @@ class SpeechService:
             'region_name': settings.AWS_REGION
         }
         
-        if settings.ENV == 'development':
-            # For local development, we'll use a mock
+        # Use mock mode if in development OR if AWS credentials are not configured
+        # This allows demo mode in production without real S3/Transcribe
+        if settings.ENV == 'development' or not settings.AWS_ACCESS_KEY_ID:
             self.mock_mode = True
+            logger.info("SpeechService initialized in mock mode (demo)")
         else:
             self.mock_mode = False
             self.transcribe_client = boto3.client('transcribe', **client_config)
+            logger.info("SpeechService initialized with AWS Transcribe")
     
     async def transcribe_audio(
         self,
